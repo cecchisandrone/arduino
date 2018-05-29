@@ -1,16 +1,19 @@
 #include <stdio.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
+#include <ESP8266mDNS.h>
 
 #define HTTP_REST_PORT 1337
 #define WIFI_RETRY_DELAY 500
 #define MAX_WIFI_INIT_RETRY 50
 #define GPIO_PIN 0
+#define DEVICE_NAME "cib-door"
 
-const char* wifi_ssid = "Tp-Link";
+const char* wifi_ssid = "Tp-Link-Ext";
 const char* wifi_passwd = "16071607";
 byte relayStatus = LOW;
-
+int duration = -1;
+MDNSResponder mdns;
 ESP8266WebServer http_rest_server(HTTP_REST_PORT);
 
 int init_wifi() {
@@ -56,8 +59,15 @@ void put_relay() {
     else {   
         if (http_rest_server.method() == HTTP_PUT) {
             relayStatus = jsonBody["status"];
-            Serial.println(relayStatus);
+            duration = jsonBody["duration"];
             digitalWrite(GPIO_PIN, relayStatus);
+            if(duration > 0) {
+              delay(duration);
+              relayStatus = relayStatus ^ 1;              
+              Serial.print("New value: " );
+              Serial.println(relayStatus);
+              digitalWrite(GPIO_PIN, relayStatus);
+            }
             http_rest_server.send(200);            
         }
     }
@@ -80,6 +90,14 @@ void setup(void) {
         Serial.print(wifi_ssid);
         Serial.print("--- IP: ");
         Serial.println(WiFi.localIP());
+
+        if (mdns.begin(DEVICE_NAME, WiFi.localIP())) {
+          Serial.println("MDNS responder started");
+          mdns.addService("relay", "tcp", HTTP_REST_PORT);    
+        }
+        else {
+          Serial.println("MDNS.begin failed");
+        }
     }
     else {
         Serial.print("Error connecting to: ");

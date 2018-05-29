@@ -1,9 +1,12 @@
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 
 const char* ssid = "Tp-Link";
 const char* password = "16071607";
 const int ledPin = 0;
-WiFiServer server(1337);
+const int port = 1337;
+MDNSResponder mdns;
+WiFiServer server(port);
 
 void printWiFiStatus();
 
@@ -57,5 +60,13 @@ void printWiFiStatus() {
   Serial.println(ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+
+  if (mdns.begin("espWebSock", WiFi.localIP())) {
+    Serial.println("MDNS responder started");
+    mdns.addService("led", "tcp", port);    
+  }
+  else {
+    Serial.println("MDNS.begin failed");
+  }
 }
 
