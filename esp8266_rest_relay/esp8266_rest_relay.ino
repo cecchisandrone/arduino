@@ -5,12 +5,12 @@
 
 #define HTTP_REST_PORT 1337
 #define WIFI_RETRY_DELAY 500
-#define MAX_WIFI_INIT_RETRY 50
+#define MAX_WIFI_INIT_RETRY 200
 #define GPIO_PIN 0
 #define DEVICE_NAME "cib-door"
 
-const char* wifi_ssid = "Tp-Link-Ext";
-const char* wifi_passwd = "16071607";
+const char* wifi_ssid = "checkinabox";
+const char* wifi_passwd = "checkinabox";
 byte relayStatus = LOW;
 int duration = -1;
 MDNSResponder mdns;
