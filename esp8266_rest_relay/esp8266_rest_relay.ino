@@ -1,4 +1,4 @@
-#include <stdio.h>
+ #include <stdio.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
 #include <ESP8266mDNS.h>
@@ -15,10 +15,8 @@ extern "C"
 #define HEALTH_CHECK_INTERVAL 30000
 #define DEVICE_NAME "cib-door"
 
-//const char* wifi_ssid = "FRITZ!Box WLAN";
-//const char* wifi_passwd = "16071607";
-const char* wifi_ssid = "checkinabox";
-const char* wifi_passwd = "checkinabox";
+const char* wifi_ssid = "FRITZ!Box WLAN";
+const char* wifi_passwd = "16071607";
 byte relayStatus = LOW;
 int duration = -1;
 int lastMillis = 0, currentMillis = 0;
