@@ -6,7 +6,7 @@
 /* LED pin */
 byte ledPin = 2;
 /* pin that is attached to interrupt */
-byte interruptPin = 13;
+byte interruptPin = 34;
 /* hold the state of LED when toggling */
 volatile byte state = LOW;
 volatile int interruptCounter = 0;
@@ -28,7 +28,7 @@ void setup() {
   /* attach interrupt to the pin
   function blink will be invoked when interrupt occurs
   interrupt occurs whenever the pin change value */
-  attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, FALLING);
 }
 
 void loop() {

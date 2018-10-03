@@ -2,25 +2,34 @@
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
 #include <ESP8266mDNS.h>
+#include <Pinger.h>
+extern "C"
+{
+  #include <lwip/icmp.h> // needed for icmp packet definitions
+}
 
 #define HTTP_REST_PORT 1337
 #define WIFI_RETRY_DELAY 500
 #define MAX_WIFI_INIT_RETRY 200
 #define GPIO_PIN 0
+#define HEALTH_CHECK_INTERVAL 30000
 #define DEVICE_NAME "cib-door"
 
+//const char* wifi_ssid = "FRITZ!Box WLAN";
+//const char* wifi_passwd = "16071607";
 const char* wifi_ssid = "checkinabox";
 const char* wifi_passwd = "checkinabox";
 byte relayStatus = LOW;
 int duration = -1;
+int lastMillis = 0, currentMillis = 0;
 MDNSResponder mdns;
 ESP8266WebServer http_rest_server(HTTP_REST_PORT);
+Pinger pinger;
+IPAddress gateway;
 
 int init_wifi() {
     int retries = 0;
-
     Serial.println("Connecting to WiFi AP..........");
-
     WiFi.mode(WIFI_STA);
     WiFi.begin(wifi_ssid, wifi_passwd);
     // check the status of WiFi connection to be WL_CONNECTED
@@ -29,6 +38,7 @@ int init_wifi() {
         delay(WIFI_RETRY_DELAY);
         Serial.print("#");
     }
+    Serial.println();
     return WiFi.status(); // return the WiFi connection status
 }
 
@@ -84,12 +94,29 @@ void config_rest_server_routing() {
 
 void setup(void) {
     Serial.begin(115200);
+    pinger.OnEnd([](const PingerResponse& response)
+      {
+        // Evaluate lost packet percentage
+        float loss = 100;
+        if(response.TotalReceivedResponses > 0)
+        {
+          loss = (response.TotalSentRequests - response.TotalReceivedResponses) * 100 / response.TotalSentRequests;
+        }
+        if(loss == 100) {
+          Serial.println("Connection to gateway is lost...rebooting");
+          ESP.restart();
+        }    
+        return true;
+      });
     pinMode(GPIO_PIN, OUTPUT);
     if (init_wifi() == WL_CONNECTED) {
         Serial.print("Connected to ");
-        Serial.print(wifi_ssid);
+        Serial.println(wifi_ssid);
         Serial.print("--- IP: ");
         Serial.println(WiFi.localIP());
+        Serial.print("--- Gateway: ");
+        Serial.println(WiFi.gatewayIP());
+        gateway = WiFi.gatewayIP();
 
         if (mdns.begin(DEVICE_NAME, WiFi.localIP())) {
           Serial.println("MDNS responder started");
@@ -105,11 +132,18 @@ void setup(void) {
     }
 
     config_rest_server_routing();
-
     http_rest_server.begin();
     Serial.println("HTTP REST Server Started");
 }
 
-void loop(void) {
+void loop(void) {    
+    currentMillis = millis();
+    if (currentMillis - lastMillis >= HEALTH_CHECK_INTERVAL)
+    {      
+      lastMillis = currentMillis;      
+      if(pinger.Ping(gateway) == false) {
+        Serial.println("Error during ping command");        
+      }
+    }
     http_rest_server.handleClient();
 }
