@@ -2,8 +2,10 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include "DHT.h"
+#include <HTTPClient.h>
 
 #define DHTTYPE DHT11
+#define HEALTH_CHECK_INTERVAL 3600000
 
 /**
  * This constant is calculated with the following procedure:
@@ -16,6 +18,7 @@ const char* ssid = "Tp-Link";
 const char* password = "16071607";
 
 WebServer server(80);
+HTTPClient http;
 
 /* LED pin */
 byte ledPin = 2;
@@ -30,6 +33,8 @@ int numberOfInterrupts = 0;
 long debouncing_time = 250; //Debouncing Time in Milliseconds
 volatile unsigned long last_micros;
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+int lastMillis = 0, currentMillis = 0;
+int connectivityChecks = 0;
 
 // Initialize DHT sensor.
 DHT dht(DHTPin, DHTTYPE);
@@ -114,6 +119,10 @@ void setup() {
     }    
   });
 
+  server.on("/connectivity-checks", []() {
+    server.send(200, "text/plain", String(connectivityChecks));        
+  });
+
   server.onNotFound([]() {
     server.send(404, "text/plain", "Not found");
   });
@@ -138,4 +147,22 @@ void loop() {
     state = !state;
     digitalWrite(ledPin, state);    
   }  
+  // Check connectivity
+  currentMillis = millis();
+  if (currentMillis - lastMillis >= HEALTH_CHECK_INTERVAL)
+  {      
+    lastMillis = currentMillis;      
+    http.begin("http://ipinfo.io/ip");
+    int httpCode = http.GET(); 
+    if (httpCode > 0) { //Check for the returning code 
+      String payload = http.getString();
+      Serial.println(httpCode);
+      Serial.println(payload);
+      connectivityChecks++;
+    } else {
+      Serial.println("Error on HTTP request, restarting ESP32");
+      ESP.restart();
+    } 
+    http.end(); //Free the resources
+  }
 }
