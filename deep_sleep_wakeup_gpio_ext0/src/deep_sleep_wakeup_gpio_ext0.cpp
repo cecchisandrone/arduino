@@ -17,8 +17,10 @@
   Pranav Cherukupalli <cherukupallip@gmail.com>
 */
 
+#include <Arduino.h>
+
 RTC_DATA_ATTR int bootCount = 0;
-gpio_num_t WAKEUP_PIN = GPIO_NUM_13;
+gpio_num_t WAKEUP_PIN = GPIO_NUM_32;
 
 /*
   Method to print the reason by which ESP32
@@ -47,7 +49,7 @@ void print_wakeup_reason() {
 
 void setup() {
   Serial.begin(115200);
-  
+  delay(3000);
   //Increment boot number and print it every reboot
   ++bootCount;
   Serial.println("Boot number: " + String(bootCount));
