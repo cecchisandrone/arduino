@@ -54,9 +54,6 @@ void setup() {
   // GPIO init
   pinMode(ledPin, OUTPUT);
   pinMode(inputPin, INPUT_PULLUP);
-  /* attach interrupt to the pin
-  function blink will be invoked when interrupt occurs
-  interrupt occurs whenever the pin change value */
   attachInterrupt(digitalPinToInterrupt(inputPin), handleInterrupt, FALLING);
 
   // WIFI initialization
