@@ -1,12 +1,12 @@
 #include <Arduino.h>
 
 /*
-  ESP8266 LED Blink
+  ESP32 LED Blink
   Turns on an LED on for one second, then off for one second, repeatedly.
   The ESP32 has an internal blue LED at D2 (GPIO 02)
 */
 
-int LED = 0;
+int LED = 2;
 
 void setup()
 { 
