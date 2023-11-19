@@ -21,7 +21,7 @@ void put_relay_handler() {
     server.send(400, "application/json", "{\"message\":\"Bad Request\"}");
     return;
   }
-  JsonArray pins = doc["pins"];
+  JsonArray pins = doc.as<JsonArray>();
   for (JsonVariant pin : pins) {
     int pin_number = pin["pin"];
     bool pin_status = pin["status"];
@@ -34,8 +34,22 @@ void put_relay_handler() {
   server.send(200, "application/json", "{\"message\":\"OK\"}");
 }
 
+void get_relay_handler() {
+  StaticJsonDocument<350> doc;
+  JsonArray array = doc.to<JsonArray>();
+  for (int i = 0; i < 4; i++) {
+    JsonObject pin = array.createNestedObject();
+    pin["pin"] = i;
+    pin["status"] = digitalRead(relayPins[i]) == LOW;
+  }
+  String output;
+  serializeJson(doc, output);
+  server.send(200, "application/json", output);
+}
+
 void setup_server() {
-  server.on("/relay", HTTP_POST, put_relay_handler);
+  server.on("/relay", HTTP_PUT, put_relay_handler);
+  server.on("/relay", HTTP_GET, get_relay_handler);
   server.begin();
   Serial.println("HTTP server started");
 }
