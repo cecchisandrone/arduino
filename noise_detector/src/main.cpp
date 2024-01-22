@@ -14,9 +14,9 @@
 
 const char* ssid = STR(WIFI_SSID);
 const char* password = STR(WIFI_PASSWORD);
-const char* plivoBasicAuth = STR(PLIVO_BASIC_AUTH);
-const char* plivoAuthId = STR(PLIVO_AUTH_ID);
+const char* voxloudApiKey = STR(VOXLOUD_API_KEY);
 const char* phone_number = STR(PHONE_NUMBER);
+const char* voxloudUrl = "https://developer.voxloud.com/api/v1/click-to-call/50e32e9b1fe0f44b384db360e29c2ced/connect";
 
 byte ledPin = 2;
 byte inputPin = 32;
@@ -24,7 +24,6 @@ int val = 0;
 int count = 0;
 unsigned long currentTime = 0;
 unsigned long lastSound = 0;
-char plivoUrl[100];
 HTTPClient http;
 WebServer server(80);
 int duration;
@@ -113,11 +112,10 @@ void call_number() {
     Serial.printf("Calling %s\n", phone_number);
     char authHeader[200];
     char payload[300];  
-    http.begin(plivoUrl);
-    sprintf(authHeader, "Basic %s", plivoBasicAuth);
+    http.begin(voxloudUrl);
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("Authorization", authHeader);
-    sprintf(payload, "{\"from\":\"+3906123456789\",\"to\":\"%s\",\"answer_url\":\"https://s3.amazonaws.com/static.plivo.com/answer.xml\",\"answer_method\":\"GET\"}", phone_number);
+    http.addHeader("Voverc-Auth", voxloudApiKey);
+    sprintf(payload, "{\"contact\":\"%s\"}", phone_number);
     int httpCode = http.POST(payload); 
     if (httpCode > 0) { //Check for the returning code 
       String payload = http.getString();
@@ -143,8 +141,7 @@ void setup() {
   Serial.println(ssid);
   Serial.print("Password: ");
   Serial.println(password);
-  sprintf(plivoUrl, "https://api.plivo.com/v1/Account/%s/Call/", plivoAuthId);
-  Serial.printf("Plivo URL: %s\n", plivoUrl);
+  Serial.printf("Voxloud URL: %s\n", voxloudUrl);
 
   // Init EEPROM
   duration = EEPROM.read(DURATION_ADDRESS);
