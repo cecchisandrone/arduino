@@ -6,13 +6,13 @@
 #define STR(x) XSTR(x)
 
 const char* ssid = STR(WIFI_SSID);
-const char* password = STR(WIFI_PASSWORD);
+const char* psk = STR(WIFI_PASSWORD);
 
 WebServer server(80);
 byte ledPin = 2;
 byte relayPins[] = {13, 14, 27, 26};
 
-void put_relay_handler() {
+void handlePutThreshold() {
   StaticJsonDocument<350> doc;
   DeserializationError error = deserializeJson(doc, server.arg("plain"));
   if (error) {
@@ -34,7 +34,7 @@ void put_relay_handler() {
   server.send(200, "application/json", "{\"message\":\"OK\"}");
 }
 
-void get_relay_handler() {
+void handleGetThreshold() {
   StaticJsonDocument<350> doc;
   JsonArray array = doc.to<JsonArray>();
   for (int i = 0; i < 4; i++) {
@@ -48,8 +48,8 @@ void get_relay_handler() {
 }
 
 void setup_server() {
-  server.on("/relay", HTTP_PUT, put_relay_handler);
-  server.on("/relay", HTTP_GET, get_relay_handler);
+  server.on("/relay", HTTP_PUT, handlePutThreshold);
+  server.on("/relay", HTTP_GET, handleGetThreshold);
   server.begin();
   Serial.println("HTTP server started");
 }
@@ -76,7 +76,7 @@ void setup()
 
   // WIFI initialization
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, psk);
 
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
