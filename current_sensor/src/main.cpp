@@ -9,7 +9,7 @@
 #define XSTR(x) #x
 #define STR(x) XSTR(x)
 #define EEPROM_SIZE 4
-#define THRESHOLD_ADDRESS 0
+#define POWER_THRESHOLD_ADDRESS 0
 
 const char* ssid = STR(WIFI_SSID);
 const char* psk = STR(WIFI_PASSWORD);
@@ -19,10 +19,13 @@ const String smarthomeHost = STR(SMARTHOME_HOST);
 const int smarthomePort = SMARTHOME_PORT;
 const String smarthomeUrl = "http://" + smarthomeHost + ":" + smarthomePort + "/api/v1";
 const String deviceName = STR(DEVICE_NAME);
-int threshold;
-bool notifyStatus = false;
+int powerThreshold;
+int vacThreshold;
+bool powerNotifyStatus = false;
+bool vacNotifyStatus = false;
 const byte ledPin = 2;
-const byte adcPin = 34;
+const byte voltagePin = 33;
+const byte currentPin = 34;
 const int mVperAmp = 66; // This the 5A version of the ACS712 -use 100 for 20A Module and 66 for 30A Module
 int watt = 0;
 double voltage = 0;
@@ -33,7 +36,9 @@ const double error = 0.25; // error from the sensor
 const double calibrationFactor = 0.8; // This is own empirically established calibration factor as the voltage measured at D34 depends on the length of the OUT-to-D34 wire
 const int sampleInterval = 1000; // sample interval in milliseconds
 WebServer server(80);
-
+int adcMax = 2400; // Maximum sensor value during calibration
+int adcMin = 1400; // Minimum sensor value during calibration
+ 
 void blink_led() {  
   digitalWrite(ledPin, HIGH);
   delay(500);
@@ -54,16 +59,16 @@ void handlePutThreshold() {
     return;
   }
   JsonObject config = doc.as<JsonObject>();
-  threshold = config["threshold"];
-  EEPROM.put(THRESHOLD_ADDRESS, threshold);
+  powerThreshold = config["threshold"];
+  EEPROM.put(POWER_THRESHOLD_ADDRESS, powerThreshold);
   EEPROM.commit();
-  Serial.printf("Threshold set to %d\n", threshold);
+  Serial.printf("Threshold set to %d\n", powerThreshold);
   server.send(200, "application/json", "{\"message\":\"OK\"}");
 }
 
 void handleGetThreshold() {
   StaticJsonDocument<16> doc;
-  doc["threshold"] = threshold;
+  doc["threshold"] = powerThreshold;
   String output;
   serializeJson(doc, output);
   server.send(200, "application/json", output);
@@ -119,7 +124,8 @@ void setup() {
   // Init EEPROM  
   EEPROM.begin(EEPROM_SIZE);
   pinMode (ledPin, OUTPUT);
-  pinMode (adcPin, INPUT);
+  pinMode (currentPin, INPUT);
+  pinMode (voltagePin, INPUT);
 
   Serial.begin(115200);
   Serial.println("Configuration:");
@@ -127,8 +133,8 @@ void setup() {
   Serial.println(ssid);
   Serial.print("Password: ");
   Serial.println(psk);
-  threshold = EEPROM.read(THRESHOLD_ADDRESS);
-  Serial.printf("Threshold: %d\n", threshold);
+  powerThreshold = EEPROM.read(POWER_THRESHOLD_ADDRESS);
+  Serial.printf("Threshold: %d\n", powerThreshold);
   Serial.printf("Smarthome URL: %s\n", smarthomeUrl.c_str());
 
   // WIFI initialization
@@ -152,7 +158,7 @@ void setup() {
   setup_server();
 }
 
-float getVPP()
+float getVPP(int pin)
 {
   float result;
   int readValue;                // value read from the sensor
@@ -162,7 +168,7 @@ float getVPP()
   uint32_t start_time = millis();
   while((millis()-start_time) < sampleInterval) // sampling
   {
-      readValue = analogRead(adcPin);
+      readValue = analogRead(pin);
       // see if you have a new maxValue
       if (readValue > maxValue) 
       {
@@ -175,27 +181,64 @@ float getVPP()
           minValue = readValue;
       }
    }
-   
-   // Subtract min from max
    result = ((maxValue - minValue) * 3.3)/4096.0; //ESP32 ADC resolution 4096
    return result;
 }
 
-void notify(int watt) {
-  if (watt >= threshold && !notifyStatus) {
-    notifyStatus = true;
-    String message = "Power consumption is over the threshold " + String(threshold) + ". Current consumption: " + String(watt) + "W";
+float getVoltage() {
+  float adcSample;
+  float voltInst = 0;
+  float sum = 0;
+  float volt;
+  long initTime = millis();
+  int n = 0;
+ 
+  while ((millis() - initTime) < 500) { // Duration of 0.5 seconds (Approximately 30 cycles of 60Hz)
+    adcSample = analogRead(voltagePin); // Sensor voltage
+    //Serial.print(">val: ");
+    //Serial.println(adcSample);
+    voltInst = map(adcSample, adcMin, adcMax, -acVoltage * 1.4142, acVoltage * 1.4142); // Instantaneous voltage
+    sum += sq(voltInst); // Sum of Squares
+    n++;
+    delay(1);
+  }
+  volt = sqrt(sum / n); // RMS equation
+  return volt;
+}
+
+void notifyPower(int watt) {
+  if (watt >= powerThreshold && !powerNotifyStatus) {
+    powerNotifyStatus = true;
+    String message = "Power consumption is over the threshold " + String(powerThreshold) + ". Current consumption: " + String(watt) + " W";
     sendNotification(message);
-  } else if (watt < threshold && notifyStatus) {
-    notifyStatus = false;
-    String message = "Power consumption is under the threshold " + String(threshold) + ". Current consumption: " + String(watt) + "W";
+  } else if (watt < powerThreshold && powerNotifyStatus) {
+    powerNotifyStatus = false;
+    String message = "Power consumption is under the threshold " + String(powerThreshold) + ". Current consumption: " + String(watt) + " W";
+    sendNotification(message);
+  }
+}
+
+void notifyVac(float acVoltage) {
+  if (acVoltage >= vacThreshold && !vacNotifyStatus) {
+    vacNotifyStatus = true;
+    String message = "VAC is above the threshold " + String(vacThreshold) + ". Current VAC: " + String(acVoltage) + " VAC";
+    sendNotification(message);
+  } else if (watt < powerThreshold && vacNotifyStatus) {
+    vacNotifyStatus = false;
+    String message = "Warning: VAC is under the threshold " + String(vacThreshold) + ". Current VAC: " + String(acVoltage) + " VAC";
     sendNotification(message);
   }
 }
 
 void loop() {
-  server.handleClient();
-  voltage = getVPP();
+  
+  // VAC measurement
+  double acVoltage = getVoltage();
+  Serial.print("VAC: ");
+  Serial.println(acVoltage);
+
+  // Power calculation
+  voltage = getVPP(currentPin);
   vrms = (voltage/2.0) * 0.707;   //root 2 is 0.707
   ampsRms = ((vrms * 1000)/mVperAmp)-error;
   Serial.print("Voltage: ");
@@ -205,6 +248,7 @@ void loop() {
   watt = (ampsRms * acVoltage / calibrationFactor);
   Serial.print(" - Watts: ");
   Serial.println(watt);
-  notify(watt);
-  delay(500);
+  notifyPower(watt);
+  notifyVac(acVoltage);
+  server.handleClient();
 }
