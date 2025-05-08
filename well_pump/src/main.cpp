@@ -39,8 +39,11 @@ void blinkLed(int times, int millis) {
 }
 
 int init_wifi() {
+    delay(3000);
     int retries = 0;
-    Serial.println("Connecting to WiFi AP..........");
+    Serial.println("Connecting to WiFi AP:");
+    Serial.println(wifi_ssid);
+    Serial.println(wifi_passwd);
     WiFi.mode(WIFI_STA);
     WiFi.begin(wifi_ssid, wifi_passwd);
     // check the status of WiFi connection to be WL_CONNECTED
@@ -48,6 +51,7 @@ int init_wifi() {
         retries++;
         delay(WIFI_RETRY_DELAY);
         Serial.print("#");
+        blinkLed(1, 200);
     }
     Serial.println();
     return WiFi.status(); // return the WiFi connection status
